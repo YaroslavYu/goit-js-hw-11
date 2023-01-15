@@ -1,0 +1,25 @@
+.gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+
+  padding-top: 20px;
+
+  //   margin-left: auto;
+  //   margin-right: auto;
+}
+
+.photo-card {
+  width: 350px;
+  height: auto;
+}
+
+.info {
+  display: flex;
+}
+
+.gallery img {
+  width: 100%;
+  //   height: 75%;
+}
