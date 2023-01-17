@@ -12,7 +12,7 @@ const options = {
 
 async function fetchAndLoad() {
   try {
-    const response = await axios.get('http://pixabay.com/api', options);
+    const response = await axios.get('https://pixabay.com/api', options);
     const data = response.data;
     return data;
   } catch (error) {
