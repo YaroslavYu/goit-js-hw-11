@@ -1,6 +1,7 @@
 // key (required)	str	Your API key: 32598481-51c6e368c4b2f2440a6e9b5e3
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
+import { Notify } from 'notiflix/build/notiflix-notify-aio';
 
 const axios = require('axios').default;
 
@@ -10,11 +11,15 @@ const observedSentinel = document.querySelector('.js-sentinel');
 
 const observerParams = {
   root: null,
-  rootMargin: '100px',
+  rootMargin: '300px',
   threshold: 1.0,
 };
 
 const observer = new IntersectionObserver(onInfinityLoad, observerParams);
+const lightbox = new SimpleLightbox('.gallery .photo-card__item');
+
+let totalPages = 0;
+let totalImages = 0;
 
 console.log(formSearch.children.searchQuery.value);
 
@@ -27,33 +32,54 @@ const options = {
     image_type: 'photo',
     orientation: 'horizontal',
     safesearch: true,
-    per_page: 20,
+    per_page: 40,
     page: 1,
   },
 };
 
 async function onSubmitFormSearch(e) {
   e.preventDefault();
-  console.log(formSearch.children.searchQuery.value);
+  observer.unobserve(observedSentinel);
+  gallery.innerHTML = '';
+  // console.log(formSearch.children.searchQuery.value);
   options.params.q = formSearch.children.searchQuery.value;
-  await fetchAndLoad();
+  options.params.page = 1;
 
-  // try {
-  //   const response = await axios.get('https://pixabay.com/api', options);
-  //   const data = response.data.hits;
-  //   console.log(response);
+  const data = await fetchAndLoad();
+  const markupGallery = createMarkupGallery(data);
+  gallery.insertAdjacentHTML('beforeend', markupGallery);
+  lightbox.refresh();
 
-  //   console.log(data);
-  //   createMarkupGallery(data);
-  //   observer.observe(observedSentinel);
-  // } catch (error) {
-  //   console.error(error);
-  // }
+  // await fetchAndLoad();
+  if (totalPages > 1) {
+    setTimeout(observer.observe(observedSentinel), 1000);
+  }
 }
 
-// axios
-//   .get('https://pixabay.com/api/?key=32598481-51c6e368c4b2f2440a6e9b5e3&q=dog')
-//   .then(console.log);
+async function fetchAndLoad() {
+  try {
+    const response = await axios.get('https://pixabay.com/api', options);
+    const data = response.data.hits;
+    totalImages = response.data.totalHits;
+    totalPages = Math.ceil(response.data.totalHits / 40);
+    console.log(response);
+    if (totalImages) {
+      Notify.info(`Hooray! We found ${totalImages} images.`);
+    }
+
+    if (!data.length) {
+      Notify.failure(
+        'Sorry, there are no images matching your search query. Please try again.'
+      );
+      return;
+    }
+    return data;
+    // console.log(totalPages);
+    createMarkupGallery(data);
+  } catch (error) {
+    console.log(error);
+  }
+}
 
 async function createMarkupGallery(data) {
   let markup = '';
@@ -68,7 +94,7 @@ async function createMarkupGallery(data) {
       downloads,
     } = element;
     markup += `<div class="photo-card">
-  <a href="${largeImageURL} class="photo-card__item"><img src="${webformatURL}" alt="${tags}" loading="lazy" /></a>
+  <a href="${largeImageURL}" class="photo-card__item"><img src="${webformatURL}" alt="${tags}" loading="lazy" /></a>
   <div class="info">
     <p class="info-item">
       <b>Likes: </b>${likes}
@@ -85,34 +111,59 @@ async function createMarkupGallery(data) {
   </div>
 </div>`;
   }
-  await gallery.insertAdjacentHTML('beforeend', markup);
-  const lightbox = new SimpleLightbox('.gallery .photo-card__item', {
-    captionsData: 'alt',
-    captionDelay: 250,
-  });
-  observer.observe(observedSentinel);
+  // const lastItemElemkent = gallery.lastElementChild;
+
+  // console.log(lastItemElemkent);
+
+  return markup;
+
+  gallery.insertAdjacentHTML('beforeend', markup);
+  lightbox.refresh();
+  if (options.params.page !== 1) {
+    console.log('unscroll', options.params.page);
+    const { height: cardHeight } = document
+      .querySelector('.gallery')
+      .firstElementChild.getBoundingClientRect();
+
+    window.scrollBy({
+      top: cardHeight * 2,
+      behavior: 'smooth',
+    });
+  }
+  // if (lastItemElemkent) {
+  //   const ifNeedScrollElem = lastItemElemkent.nextElementSibling;
+  //   // console.log(lastItemElemkent.nextElementSibling);
+  //   if (ifNeedScrollElem) {
+  //     setTimeout(() => {
+  //       lastItemElemkent.nextElementSibling.scrollIntoView({
+  //         block: 'start',
+  //         behavior: 'smooth',
+  //       });
+  //     }, 600);
+  //   }
+  // }
+  // observer.unobserve(observedSentinel);
+
+  // if (totalPages > 1) {
+  //   setTimeout(observer.observe(observedSentinel), 1000);
+  // }
 }
 
-function onInfinityLoad(entries, observer) {
+function onInfinityLoad(entries) {
   // console.log('123');
-  entries.forEach(entry => {
+  console.log('total pages:', totalPages);
+  console.log('page number:', options.params.page);
+  options.params.page += 1;
+  // console.log(observer.observe);
+
+  entries.forEach(async entry => {
     if (entry.isIntersecting) {
-      console.log(entry.isIntersecting, 'fdf');
-      fetchAndLoad();
+      console.log('load more');
+      await fetchAndLoad();
+    }
+    if (totalPages < options.params.page) {
+      observer.unobserve(observedSentinel);
+      console.log('unobsrve');
     }
   });
-}
-
-async function fetchAndLoad() {
-  try {
-    const response = await axios.get('https://pixabay.com/api', options);
-    const data = response.data.hits;
-    console.log(response);
-
-    console.log(data);
-    createMarkupGallery(data);
-    options.params.page += 1;
-  } catch (error) {
-    console.error(error);
-  }
 }
